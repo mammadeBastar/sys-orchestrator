@@ -3,6 +3,7 @@ package sysapp
 import (
 	"context"
 	"crypto/sha256"
+	"embed"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -113,6 +114,9 @@ var controlledSystemFiles = []string{
 	"system/contracts/auth.md",
 	"system/data/schema.sql",
 }
+
+//go:embed templates/agents/codex/*/SKILL.md templates/agents/cursor/sys-orchestrator.mdc templates/agents/claude/CLAUDE.section.md
+var agentTemplates embed.FS
 
 func New(opts Options) *App {
 	if opts.Dir == "" {
@@ -794,12 +798,16 @@ func (a *App) runOpenSpec(root string, args ...string) error {
 
 func installCodex(root string) error {
 	skills := map[string]string{
-		"sys-explore":       codexExploreSkill(),
-		"sys-capture":       codexCaptureSkill(),
-		"sys-apply":         codexApplySkill(),
-		"sys-design-change": codexDesignChangeSkill(),
+		"sys-explore":       "codex/sys-explore/SKILL.md",
+		"sys-capture":       "codex/sys-capture/SKILL.md",
+		"sys-apply":         "codex/sys-apply/SKILL.md",
+		"sys-design-change": "codex/sys-design-change/SKILL.md",
 	}
-	for name, content := range skills {
+	for name, templatePath := range skills {
+		content, err := agentInstructionTemplate(templatePath)
+		if err != nil {
+			return err
+		}
 		path := filepath.Join(root, ".codex", "skills", name, "SKILL.md")
 		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 			return err
@@ -812,11 +820,15 @@ func installCodex(root string) error {
 }
 
 func installCursor(root string) error {
+	content, err := agentInstructionTemplate("cursor/sys-orchestrator.mdc")
+	if err != nil {
+		return err
+	}
 	path := filepath.Join(root, ".cursor", "rules", "sys-orchestrator.mdc")
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return err
 	}
-	return os.WriteFile(path, []byte(cursorRules()), 0o644)
+	return os.WriteFile(path, []byte(content), 0o644)
 }
 
 func installClaude(root string) error {
@@ -826,7 +838,10 @@ func installClaude(root string) error {
 		existing = string(data)
 	}
 
-	section := claudeSection()
+	section, err := agentInstructionTemplate("claude/CLAUDE.section.md")
+	if err != nil {
+		return err
+	}
 	start := "<!-- SYS-ORCHESTRATOR:START -->"
 	end := "<!-- SYS-ORCHESTRATOR:END -->"
 
@@ -843,94 +858,10 @@ func installClaude(root string) error {
 	return os.WriteFile(path, []byte(next), 0o644)
 }
 
-func codexExploreSkill() string {
-	return `---
-name: sys-explore
-description: Explore system design using /system as the current project truth. Does not create OpenSpec changes during design phase.
----
-
-Use this skill when the user wants to design or explore the system.
-
-1. Run or read ` + "`sys status --json`" + ` when useful.
-2. Infer role from the current working directory.
-3. Read only the system files allowed for that role.
-4. During design phase, do not create OpenSpec changes.
-5. When a decision is finalized, tell the user to invoke sys-capture.
-`
-}
-
-func codexCaptureSkill() string {
-	return `---
-name: sys-capture
-description: Capture finalized design decisions into /system during design phase.
----
-
-Use this skill after the user has made a hard design decision.
-
-1. Run ` + "`sys capture`" + ` and follow its guidance.
-2. Update the relevant /system files directly.
-3. Add a decision record under system/architecture/decisions/.
-4. Do not use OpenSpec during design phase.
-5. If the project is in build phase, stop and use sys-design-change instead.
-`
-}
-
-func codexApplySkill() string {
-	return `---
-name: sys-apply
-description: Apply OpenSpec changes using sys workflow, openspec-apply, and Superpowers discipline.
----
-
-Use this skill during build phase only.
-
-1. Confirm ` + "`sys status --json`" + ` shows build phase.
-2. Use openspec-apply-change for the named OpenSpec change.
-3. Use Superpowers test-driven development, debugging, and verification during implementation.
-4. Do not mutate frozen /system files unless sys-design-change is invoked.
-`
-}
-
-func codexDesignChangeSkill() string {
-	return `---
-name: sys-design-change
-description: Control foundational /system mutations during build phase.
----
-
-Use this skill when a build-phase change needs to mutate controlled or frozen /system truth.
-
-1. Run ` + "`sys design-change <name>`" + `.
-2. Record rationale, affected /system files, impacted OpenSpec changes, and migration notes.
-3. Update /system only after the user confirms the foundation change.
-`
-}
-
-func cursorRules() string {
-	return `---
-description: Sys Orchestrator workflow rules
-alwaysApply: true
----
-
-Use /system as the ratified system truth.
-
-- In design phase, use sys explore and sys capture semantics; do not create OpenSpec changes for design decisions.
-- In build phase, implementation changes must flow through OpenSpec and openspec-apply.
-- Do not mutate frozen /system files during build phase without sys design-change.
-- Infer frontend/backend role from the current working directory.
-- Run sys status before substantial work.
-`
-}
-
-func claudeSection() string {
-	return `<!-- SYS-ORCHESTRATOR:START -->
-## Sys Orchestrator
-
-Use /system as the ratified system truth.
-
-- Run ` + "`sys status`" + ` before substantial work.
-- During design phase, use sys explore/capture semantics and avoid OpenSpec for design decisions.
-- During build phase, implementation changes must use OpenSpec and openspec-apply.
-- Do not mutate frozen /system files during build phase without sys design-change.
-- Infer role from the current working directory.
-<!-- SYS-ORCHESTRATOR:END -->
-`
+func agentInstructionTemplate(rel string) (string, error) {
+	data, err := agentTemplates.ReadFile("templates/agents/" + rel)
+	if err != nil {
+		return "", fmt.Errorf("agent template %s not found: %w", rel, err)
+	}
+	return string(data), nil
 }

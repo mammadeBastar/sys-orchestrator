@@ -216,6 +216,133 @@ func TestAgentInstallersGenerateExpectedFilesAndPreserveClaudeContent(t *testing
 	}
 }
 
+func TestCodexInstructionPacksContainOperationalGuardrails(t *testing.T) {
+	root := t.TempDir()
+	if code, out, errOut := runApp(t, root, "init"); code != 0 {
+		t.Fatalf("init failed: code=%d stdout=%q stderr=%q", code, out, errOut)
+	}
+	if code, out, errOut := runApp(t, root, "agent", "install", "codex"); code != 0 {
+		t.Fatalf("codex install failed: code=%d stdout=%q stderr=%q", code, out, errOut)
+	}
+
+	commonMarkers := []string{
+		"## Purpose",
+		"## Initial Checks",
+		"## Phase Rules",
+		"## Role And File Access",
+		"## Workflow",
+		"## Validation",
+		"## Stop Conditions",
+		"## Do Not",
+	}
+	for _, skill := range []string{"sys-explore", "sys-capture", "sys-apply", "sys-design-change"} {
+		content := readFile(t, filepath.Join(root, ".codex", "skills", skill, "SKILL.md"))
+		assertContainsAll(t, ".codex/skills/"+skill+"/SKILL.md", content, commonMarkers)
+	}
+
+	skillSpecific := map[string][]string{
+		"sys-explore": {
+			"allowed /system files",
+			"candidate decisions",
+			"sys-capture",
+			"avoid implementation",
+		},
+		"sys-capture": {
+			"Finalized Decision",
+			"Decision Record",
+			"avoid duplicated truth",
+			"system/architecture/decisions",
+		},
+		"sys-apply": {
+			"OpenSpec",
+			"Superpowers",
+			"frozen /system files",
+			"sys design-change",
+		},
+		"sys-design-change": {
+			"explicit user confirmation",
+			"migration or compatibility notes",
+			"impacted OpenSpec changes",
+			"before and after",
+		},
+	}
+	for skill, markers := range skillSpecific {
+		content := readFile(t, filepath.Join(root, ".codex", "skills", skill, "SKILL.md"))
+		assertContainsAll(t, ".codex/skills/"+skill+"/SKILL.md", content, markers)
+	}
+}
+
+func TestCursorAndClaudeInstructionsContainWorkflowBoundaries(t *testing.T) {
+	root := t.TempDir()
+	if code, out, errOut := runApp(t, root, "init"); code != 0 {
+		t.Fatalf("init failed: code=%d stdout=%q stderr=%q", code, out, errOut)
+	}
+	for _, agent := range []string{"cursor", "claude"} {
+		if code, out, errOut := runApp(t, root, "agent", "install", agent); code != 0 {
+			t.Fatalf("%s install failed: code=%d stdout=%q stderr=%q", agent, code, out, errOut)
+		}
+	}
+
+	markers := []string{
+		"phase boundaries",
+		"/system",
+		"OpenSpec",
+		"sys design-change",
+		"role",
+		"minimal",
+	}
+	cursor := readFile(t, filepath.Join(root, ".cursor", "rules", "sys-orchestrator.mdc"))
+	assertContainsAll(t, ".cursor/rules/sys-orchestrator.mdc", cursor, markers)
+
+	claude := readFile(t, filepath.Join(root, "CLAUDE.md"))
+	assertContainsAll(t, "CLAUDE.md", claude, markers)
+}
+
+func TestClaudeInstallReplacesOnlyManagedSection(t *testing.T) {
+	root := t.TempDir()
+	if code, out, errOut := runApp(t, root, "init"); code != 0 {
+		t.Fatalf("init failed: code=%d stdout=%q stderr=%q", code, out, errOut)
+	}
+
+	claudePath := filepath.Join(root, "CLAUDE.md")
+	existing := "# Existing\n\nKeep before.\n\n<!-- SYS-ORCHESTRATOR:START -->\nold sys text\n<!-- SYS-ORCHESTRATOR:END -->\n\nKeep after.\n"
+	if err := os.WriteFile(claudePath, []byte(existing), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if code, out, errOut := runApp(t, root, "agent", "install", "claude"); code != 0 {
+		t.Fatalf("claude install failed: code=%d stdout=%q stderr=%q", code, out, errOut)
+	}
+
+	updated := readFile(t, claudePath)
+	assertContainsAll(t, "CLAUDE.md", updated, []string{
+		"Keep before.",
+		"Keep after.",
+		"## Sys Orchestrator",
+		"phase boundaries",
+	})
+	if strings.Contains(updated, "old sys text") {
+		t.Fatalf("managed sys section was not replaced:\n%s", updated)
+	}
+	if strings.Count(updated, "<!-- SYS-ORCHESTRATOR:START -->") != 1 || strings.Count(updated, "<!-- SYS-ORCHESTRATOR:END -->") != 1 {
+		t.Fatalf("managed sys section markers should appear exactly once:\n%s", updated)
+	}
+}
+
+func TestAgentInstallCommandNamesRemainStable(t *testing.T) {
+	root := t.TempDir()
+	if code, out, errOut := runApp(t, root, "init"); code != 0 {
+		t.Fatalf("init failed: code=%d stdout=%q stderr=%q", code, out, errOut)
+	}
+
+	code, out, errOut := runApp(t, root, "help")
+	if code != 0 {
+		t.Fatalf("help failed: code=%d stdout=%q stderr=%q", code, out, errOut)
+	}
+	if !strings.Contains(out, "sys agent install codex|cursor|claude") {
+		t.Fatalf("help output should keep stable agent install command names:\n%s", out)
+	}
+}
+
 func TestBuildWorkflowUsesFakeOpenSpecInBuildPhase(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("shell-script fake executable is POSIX-only")
@@ -270,4 +397,22 @@ func TestBuildWorkflowUsesFakeOpenSpecInBuildPhase(t *testing.T) {
 
 func shellQuote(s string) string {
 	return "'" + strings.ReplaceAll(s, "'", "'\\''") + "'"
+}
+
+func readFile(t *testing.T, path string) string {
+	t.Helper()
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(data)
+}
+
+func assertContainsAll(t *testing.T, label, content string, markers []string) {
+	t.Helper()
+	for _, marker := range markers {
+		if !strings.Contains(content, marker) {
+			t.Fatalf("%s missing %q:\n%s", label, marker, content)
+		}
+	}
 }

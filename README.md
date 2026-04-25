@@ -480,6 +480,26 @@ This creates:
 .codex/skills/sys-design-change/SKILL.md
 ```
 
+These are full instruction packs, not placeholder files. Each skill includes:
+
+- purpose and when to use it
+- initial `sys status` checks
+- phase rules for design and build work
+- role and `/system` file-access guidance
+- workflow steps
+- validation expectations
+- stop conditions
+- explicit "do not" guardrails
+
+The installed Codex skills are:
+
+| Skill | Purpose |
+| --- | --- |
+| `sys-explore` | Explore design questions from `/system`, surface candidate decisions, and avoid OpenSpec during design phase |
+| `sys-capture` | Write finalized design decisions into the right `/system` files and create decision records |
+| `sys-apply` | Apply OpenSpec changes in build phase while using Superpowers-style implementation discipline |
+| `sys-design-change` | Mutate controlled or frozen `/system` truth during build phase only after explicit confirmation |
+
 Typical Codex usage:
 
 ```text
@@ -510,7 +530,7 @@ This writes:
 .cursor/rules/sys-orchestrator.mdc
 ```
 
-The file contains high-level workflow rules and file-access guidance. It is not a deep runtime integration.
+The file contains explicit workflow boundaries, phase rules, `/system` authority, OpenSpec build expectations, design-change protection, and role inference guidance. It is intentionally minimal and is not a deep runtime integration.
 
 ### Claude Code
 
@@ -532,6 +552,8 @@ Existing unrelated `CLAUDE.md` content is preserved. The sys section is bounded 
 <!-- SYS-ORCHESTRATOR:START -->
 <!-- SYS-ORCHESTRATOR:END -->
 ```
+
+The managed section mirrors the minimal Cursor boundaries: it tells Claude Code how to respect design/build phases, `/system` truth, OpenSpec build workflow, `sys design-change`, and inferred role access without claiming hard sandboxing or runtime enforcement.
 
 ## Status And Validation
 
