@@ -28,6 +28,7 @@ Use this skill when build-phase work needs to mutate controlled or frozen `/syst
 - Read only the `/system` files needed to evaluate the requested foundation change.
 - If the change affects cross-boundary behavior, include `system/contracts/`.
 - If the change affects data, include `system/data/schema.sql` and `system/data/schema.md`.
+- If the change affects security truth, include `system/security/`.
 - If the change affects operations, include `system/obs/`.
 
 ## Workflow
@@ -45,6 +46,7 @@ Use this skill when build-phase work needs to mutate controlled or frozen `/syst
 
 - Capture the before and after state of affected files in the conversation summary.
 - Confirm edited `/system` files do not conflict.
+- Confirm security changes are captured in `system/security/model.md` when they affect trust boundaries, sensitive data, secrets, or security invariants.
 - Confirm impacted OpenSpec changes still describe the intended implementation.
 - Confirm validation warnings are understood after the mutation.
 - Confirm new foundation truth is precise enough for future agents.

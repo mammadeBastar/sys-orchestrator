@@ -57,7 +57,7 @@ There are three important boundaries:
 
 | Layer | Responsibility |
 | --- | --- |
-| `/system` | Current architecture, contracts, flows, modules, schema, observability, and decisions |
+| `/system` | Current architecture, contracts, flows, modules, schema, security, observability, and decisions |
 | OpenSpec | Build-phase changes to an already-understood system |
 | Superpowers | Apply-phase method for planning, TDD, debugging, and verification |
 
@@ -200,6 +200,7 @@ A sys-initialized repository contains:
 │   ├── flows/
 │   ├── modules/
 │   ├── data/
+│   ├── security/
 │   └── obs/
 ├── frontend/
 │   └── openspec/
@@ -237,7 +238,9 @@ system/
 ├── contracts/
 │   ├── api.yaml
 │   ├── events.asyncapi.yaml
-│   └── auth.md
+│   ├── auth.md
+│   ├── conventions.md
+│   └── errors.md
 ├── flows/
 ├── modules/
 │   ├── frontend.md
@@ -249,6 +252,8 @@ system/
 │       ├── indexes.md
 │       ├── triggers.md
 │       └── functions.md
+├── security/
+│   └── model.md
 └── obs/
     ├── metrics.md
     ├── logging.md
@@ -277,6 +282,8 @@ system/
 - `api.yaml` for HTTP API contracts
 - `events.asyncapi.yaml` for event contracts
 - `auth.md` for authentication and authorization boundaries
+- `conventions.md` for cross-cutting API and event conventions such as pagination, filtering, idempotency, correlation IDs, timestamps, versioning, deprecation, and rate-limit expression
+- `errors.md` for error envelopes, error codes, retryability, validation failures, and user-facing/internal error boundaries
 
 Frontend agents are expected to rely heavily on this folder.
 
@@ -311,6 +318,19 @@ system/data/db/indexes.md
 system/data/db/triggers.md
 system/data/db/functions.md
 ```
+
+### Security
+
+`system/security/model.md` records security posture:
+
+- trust boundaries
+- sensitive data rules
+- encryption expectations
+- secret handling
+- security invariants
+- threat assumptions
+
+This file documents rules and assumptions. It must not contain real secret values.
 
 ### Observability
 
@@ -392,6 +412,9 @@ system/architecture/system.md
 system/contracts/api.yaml
 system/contracts/events.asyncapi.yaml
 system/contracts/auth.md
+system/contracts/conventions.md
+system/contracts/errors.md
+system/security/model.md
 system/data/schema.sql
 ```
 
@@ -622,9 +645,11 @@ If required files are missing, validation reports warnings such as:
 
 ```text
 warning: missing required file: system/contracts/api.yaml
+warning: missing required file: system/contracts/conventions.md
+warning: missing required file: system/security/model.md
 ```
 
-If a frozen file changes after `sys design freeze`, status and validation report that `sys design-change` is required.
+If a frozen or controlled file changes after `sys design freeze`, status and validation report that `sys design-change` is required. Controlled files include API, event, auth, conventions, errors, security model, and canonical schema files.
 
 ## Command Reference
 
@@ -636,7 +661,7 @@ Initializes a repo-local sys project.
 sys init
 ```
 
-Creates `.sys-orchestrator/`, scaffolds `/system`, creates `frontend/` and `backend/` when missing, initializes OpenSpec inside `frontend/` and `backend/`, records `design` phase, and prints the next command.
+Creates `.sys-orchestrator/`, scaffolds `/system` including contracts and security files, creates `frontend/` and `backend/` when missing, initializes OpenSpec inside `frontend/` and `backend/`, records `design` phase, and prints the next command.
 
 Running it again preserves existing state, reports that the project is already initialized, and ensures the frontend/backend OpenSpec workspaces still exist. Targets that already contain `openspec/config.yaml` are skipped.
 

@@ -1,15 +1,4 @@
-## Purpose
-
-Define the canonical `/system` foundation, validation, decision records, and freeze behavior.
-
-## Requirements
-
-### Requirement: Scaffold Canonical System Tree
-The system SHALL scaffold the canonical `/system` directory structure.
-
-#### Scenario: System tree creation
-- **WHEN** a user runs `sys init`
-- **THEN** the system creates architecture, contracts, flows, modules, data, database, security, observability, dashboard, and decision-record locations under `/system`
+## ADDED Requirements
 
 ### Requirement: Scaffold Contract Convention And Error Files
 The system SHALL scaffold dedicated contract files for cross-cutting conventions and error behavior.
@@ -26,19 +15,25 @@ The system SHALL scaffold a minimal security foundation under `/system`.
 - **WHEN** a user runs `sys init`
 - **THEN** the system creates `system/security/model.md` for trust boundaries, sensitive data rules, secret handling, and security invariants
 
-### Requirement: Use Postgres SQL As Canonical Data Schema
-The system SHALL treat `system/data/schema.sql` as the canonical database schema file.
+### Requirement: Include Expanded Foundation In Role Allowlists
+The system SHALL include contract support files and the security model in default role-based system-file allowlists.
 
-#### Scenario: Schema files scaffolded
-- **WHEN** `/system` is scaffolded
-- **THEN** the system creates `system/data/schema.sql` for canonical database shape and `system/data/schema.md` for explanatory schema notes
+#### Scenario: Frontend role can read security foundation
+- **WHEN** a user invokes a sys agent workflow from `frontend/`
+- **THEN** the frontend role allowlist includes `system/contracts/**`, `system/flows/**`, `system/modules/frontend.md`, and `system/security/**`
 
-### Requirement: Record Design Decisions
-The system SHALL support append-only decision records under `system/architecture/decisions/`.
+#### Scenario: Backend role can read security foundation
+- **WHEN** a user invokes a sys agent workflow from `backend/`
+- **THEN** the backend role allowlist includes `system/contracts/**`, `system/flows/**`, `system/modules/backend.md`, `system/data/**`, `system/obs/**`, and `system/security/**`
 
-#### Scenario: Capture accepted decision
-- **WHEN** a finalized design decision is captured
-- **THEN** the system records a dated decision file containing status, decision, rationale, and affected system files
+## MODIFIED Requirements
+
+### Requirement: Scaffold Canonical System Tree
+The system SHALL scaffold the canonical `/system` directory structure.
+
+#### Scenario: System tree creation
+- **WHEN** a user runs `sys init`
+- **THEN** the system creates architecture, contracts, flows, modules, data, database, security, observability, dashboard, and decision-record locations under `/system`
 
 ### Requirement: Validate Required System Files
 The system SHALL validate the presence of required `/system` files.
@@ -69,14 +64,3 @@ The system SHALL record and check freeze baselines for controlled and frozen `/s
 #### Scenario: Controlled security file changes during build phase
 - **WHEN** the project is in build phase and `system/security/model.md` differs from its recorded freeze baseline
 - **THEN** `sys status` reports that a design-change workflow is required
-
-### Requirement: Include Expanded Foundation In Role Allowlists
-The system SHALL include contract support files and the security model in default role-based system-file allowlists.
-
-#### Scenario: Frontend role can read security foundation
-- **WHEN** a user invokes a sys agent workflow from `frontend/`
-- **THEN** the frontend role allowlist includes `system/contracts/**`, `system/flows/**`, `system/modules/frontend.md`, and `system/security/**`
-
-#### Scenario: Backend role can read security foundation
-- **WHEN** a user invokes a sys agent workflow from `backend/`
-- **THEN** the backend role allowlist includes `system/contracts/**`, `system/flows/**`, `system/modules/backend.md`, `system/data/**`, `system/obs/**`, and `system/security/**`

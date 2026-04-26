@@ -54,8 +54,11 @@ func TestInitScaffoldsProjectAndIsIdempotent(t *testing.T) {
 		"system/contracts/api.yaml",
 		"system/contracts/events.asyncapi.yaml",
 		"system/contracts/auth.md",
+		"system/contracts/conventions.md",
+		"system/contracts/errors.md",
 		"system/modules/frontend.md",
 		"system/modules/backend.md",
+		"system/security/model.md",
 		"system/data/schema.sql",
 		"system/data/schema.md",
 		"system/data/db/indexes.md",
@@ -133,24 +136,40 @@ func TestRootDiscoveryAndStatusJSON(t *testing.T) {
 	if status.Role != RoleFrontend {
 		t.Fatalf("role = %q, want %q", status.Role, RoleFrontend)
 	}
+
+	var allowlists map[string][]string
+	if err := json.Unmarshal([]byte(readFile(t, filepath.Join(root, ".sys-orchestrator", "allowlists.json"))), &allowlists); err != nil {
+		t.Fatal(err)
+	}
+	assertContainsAll(t, "frontend allowlist", strings.Join(allowlists[RoleFrontend], "\n"), []string{"system/security/**"})
+	assertContainsAll(t, "backend allowlist", strings.Join(allowlists[RoleBackend], "\n"), []string{"system/security/**"})
 }
 
 func TestValidateReportsMissingRequiredSystemFile(t *testing.T) {
-	root := t.TempDir()
-	fakeOpenSpec, _ := writeFakeOpenSpec(t, root)
-	if code, out, errOut := runAppWithOpenSpec(t, root, fakeOpenSpec, "init"); code != 0 {
-		t.Fatalf("init failed: code=%d stdout=%q stderr=%q", code, out, errOut)
-	}
-	if err := os.Remove(filepath.Join(root, "system", "contracts", "api.yaml")); err != nil {
-		t.Fatal(err)
-	}
+	for _, rel := range []string{
+		"system/contracts/api.yaml",
+		"system/contracts/conventions.md",
+		"system/contracts/errors.md",
+		"system/security/model.md",
+	} {
+		t.Run(rel, func(t *testing.T) {
+			root := t.TempDir()
+			fakeOpenSpec, _ := writeFakeOpenSpec(t, root)
+			if code, out, errOut := runAppWithOpenSpec(t, root, fakeOpenSpec, "init"); code != 0 {
+				t.Fatalf("init failed: code=%d stdout=%q stderr=%q", code, out, errOut)
+			}
+			if err := os.Remove(filepath.Join(root, rel)); err != nil {
+				t.Fatal(err)
+			}
 
-	code, out, errOut := runApp(t, root, "validate")
-	if code == 0 {
-		t.Fatalf("validate should fail when required file is missing: stdout=%q stderr=%q", out, errOut)
-	}
-	if !strings.Contains(out+errOut, "system/contracts/api.yaml") {
-		t.Fatalf("missing file warning not found in output: stdout=%q stderr=%q", out, errOut)
+			code, out, errOut := runApp(t, root, "validate")
+			if code == 0 {
+				t.Fatalf("validate should fail when required file is missing: stdout=%q stderr=%q", out, errOut)
+			}
+			if !strings.Contains(out+errOut, rel) {
+				t.Fatalf("missing file warning not found in output: stdout=%q stderr=%q", out, errOut)
+			}
+		})
 	}
 }
 
@@ -174,9 +193,14 @@ func TestDesignFreezeRecordsBaselineAndCaptureBlocksInBuild(t *testing.T) {
 		t.Fatalf("capture output should mention design-change: stdout=%q stderr=%q", out, errOut)
 	}
 
-	archPath := filepath.Join(root, "system", "architecture", "system.md")
-	if err := os.WriteFile(archPath, []byte("changed\n"), 0o644); err != nil {
-		t.Fatal(err)
+	for _, rel := range []string{
+		"system/architecture/system.md",
+		"system/contracts/errors.md",
+		"system/security/model.md",
+	} {
+		if err := os.WriteFile(filepath.Join(root, rel), []byte("changed\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
 	}
 
 	code, out, errOut = runApp(t, root, "status", "--json")
@@ -188,11 +212,48 @@ func TestDesignFreezeRecordsBaselineAndCaptureBlocksInBuild(t *testing.T) {
 	if err := json.Unmarshal([]byte(out), &status); err != nil {
 		t.Fatal(err)
 	}
-	if len(status.Validation.Warnings) == 0 {
-		t.Fatalf("expected freeze warning after architecture mutation: %#v", status)
+	if len(status.Validation.Warnings) < 3 {
+		t.Fatalf("expected freeze warnings after foundation mutations: %#v", status)
 	}
-	if !strings.Contains(out, "design-change") {
-		t.Fatalf("status should mention design-change after frozen file changes: %s", out)
+	assertContainsAll(t, "freeze warning status", out, []string{
+		"design-change",
+		"system/architecture/system.md",
+		"system/contracts/errors.md",
+		"system/security/model.md",
+	})
+}
+
+func TestDesignCommandsMentionExpandedFoundationTargets(t *testing.T) {
+	root := t.TempDir()
+	fakeOpenSpec, _ := writeFakeOpenSpec(t, root)
+	if code, out, errOut := runAppWithOpenSpec(t, root, fakeOpenSpec, "init"); code != 0 {
+		t.Fatalf("init failed: code=%d stdout=%q stderr=%q", code, out, errOut)
+	}
+
+	frontendDir := filepath.Join(root, "frontend")
+	code, out, errOut := runApp(t, frontendDir, "explore", "security")
+	if code != 0 {
+		t.Fatalf("frontend explore failed: code=%d stdout=%q stderr=%q", code, out, errOut)
+	}
+	assertContainsAll(t, "frontend explore output", out, []string{
+		"system/contracts/**",
+		"system/security/**",
+		"contract conventions",
+		"contract errors",
+	})
+
+	code, out, errOut = runApp(t, root, "capture")
+	if code != 0 {
+		t.Fatalf("capture failed in design phase: code=%d stdout=%q stderr=%q", code, out, errOut)
+	}
+	assertContainsAll(t, "capture output", out, []string{
+		"contracts",
+		"conventions",
+		"errors",
+		"security",
+	})
+	if !strings.Contains(out, "decision record") {
+		t.Fatalf("capture output should mention decision records: %s", out)
 	}
 }
 
@@ -293,12 +354,16 @@ func TestCodexInstructionPacksContainOperationalGuardrails(t *testing.T) {
 			"candidate decisions",
 			"sys-capture",
 			"avoid implementation",
+			"system/security/**",
 		},
 		"sys-capture": {
 			"Finalized Decision",
 			"Decision Record",
 			"avoid duplicated truth",
 			"system/architecture/decisions",
+			"system/contracts/conventions.md",
+			"system/contracts/errors.md",
+			"system/security/model.md",
 		},
 		"sys-apply": {
 			"OpenSpec",
@@ -308,12 +373,14 @@ func TestCodexInstructionPacksContainOperationalGuardrails(t *testing.T) {
 			"missing prerequisite",
 			"frozen /system files",
 			"sys design-change",
+			"system/security/**",
 		},
 		"sys-design-change": {
 			"explicit user confirmation",
 			"migration or compatibility notes",
 			"impacted OpenSpec changes",
 			"before and after",
+			"system/security/",
 		},
 	}
 	for skill, markers := range skillSpecific {
@@ -341,6 +408,8 @@ func TestCursorAndClaudeInstructionsContainWorkflowBoundaries(t *testing.T) {
 		"sys design-change",
 		"role",
 		"minimal",
+		"contracts",
+		"security",
 	}
 	cursor := readFile(t, filepath.Join(root, ".cursor", "rules", "sys-orchestrator.mdc"))
 	assertContainsAll(t, ".cursor/rules/sys-orchestrator.mdc", cursor, markers)

@@ -25,8 +25,8 @@ Use this skill after the user has made a Finalized Decision and wants it written
 ## Role And File Access
 
 - Respect the inferred role and its allowed `/system` files.
-- Frontend agents may update frontend modules, flows, and contracts that affect frontend behavior.
-- Backend agents may update backend modules, data, observability, flows, and contracts that affect backend behavior.
+- Frontend agents may update frontend modules, flows, security context, and contracts that affect frontend behavior.
+- Backend agents may update backend modules, data, security context, observability, flows, and contracts that affect backend behavior.
 - System-maintainer or design agents may update architecture and cross-cutting files when the user has finalized that foundation decision.
 - If a needed file is outside the role allowlist, stop and ask before proceeding.
 
@@ -34,7 +34,7 @@ Use this skill after the user has made a Finalized Decision and wants it written
 
 1. Identify the Finalized Decision in one sentence.
 2. Choose the smallest set of target `/system` files that should own the truth.
-3. Update the owning files first: architecture for invariants, contracts for boundaries, flows for user actions, modules for responsibilities, data for schemas, observability for metrics/logs/traces/alerts.
+3. Update the owning files first: architecture for invariants, contracts for boundaries, `system/contracts/conventions.md` for cross-cutting conventions, `system/contracts/errors.md` for error behavior, flows for user actions, modules for responsibilities, data for schemas, `system/security/model.md` for security posture, and observability for metrics/logs/traces/alerts.
 4. Avoid duplicated truth by linking or summarizing instead of repeating full details across multiple files; explicitly avoid duplicated truth across `/system` files.
 5. Add a Decision Record under `system/architecture/decisions/` when the decision affects architecture, contracts, data, observability, security, or cross-service behavior.
 6. Keep prose direct and durable; future agents should be able to build from it without this conversation.
@@ -57,6 +57,8 @@ Use concise filenames under `system/architecture/decisions/`, such as `auth-sess
 - Re-read every edited `/system` file.
 - Confirm the edited files agree with each other.
 - Confirm cross-boundary payloads are represented in `system/contracts/`.
+- Confirm contract conventions are represented in `system/contracts/conventions.md` and error behavior is represented in `system/contracts/errors.md`.
+- Confirm security posture changes are represented in `system/security/model.md`.
 - Confirm data changes keep `system/data/schema.sql` and `system/data/schema.md` aligned.
 - Confirm the decision record points to the files that now own the truth.
 

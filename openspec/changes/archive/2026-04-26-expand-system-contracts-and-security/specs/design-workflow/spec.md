@@ -1,8 +1,4 @@
-## Purpose
-
-Define the design-phase workflow where agents explore and capture finalized decisions without OpenSpec changes.
-
-## Requirements
+## MODIFIED Requirements
 
 ### Requirement: Explore Without OpenSpec
 The system SHALL support design-phase exploration without creating or requiring OpenSpec changes.
@@ -21,17 +17,3 @@ The system SHALL support finalized design decisions being captured directly into
 #### Scenario: Codex capture skill completes capture
 - **WHEN** the Codex `sys-capture` skill is invoked after a finalized decision
 - **THEN** the agent updates the appropriate `/system` files, including contract conventions, contract errors, or security model files when they own the decision, and writes a decision record
-
-### Requirement: Block Normal Capture In Build Phase
-The system SHALL block normal design capture after the project enters build phase.
-
-#### Scenario: Capture attempted during build phase
-- **WHEN** the project phase is `build` and a user runs `sys capture`
-- **THEN** the system reports that `sys design-change` is required instead
-
-### Requirement: Infer Agent Role From Current Directory
-The system SHALL infer agent role from the current working directory instead of requiring role-specific user commands.
-
-#### Scenario: Frontend directory role
-- **WHEN** a user invokes a sys agent workflow from `frontend/`
-- **THEN** the system treats the agent as a frontend agent and applies the frontend system-file allowlist

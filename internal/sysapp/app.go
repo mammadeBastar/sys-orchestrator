@@ -93,8 +93,11 @@ var requiredSystemFiles = []string{
 	"system/contracts/api.yaml",
 	"system/contracts/events.asyncapi.yaml",
 	"system/contracts/auth.md",
+	"system/contracts/conventions.md",
+	"system/contracts/errors.md",
 	"system/modules/frontend.md",
 	"system/modules/backend.md",
+	"system/security/model.md",
 	"system/data/schema.sql",
 	"system/data/schema.md",
 	"system/data/db/indexes.md",
@@ -112,6 +115,9 @@ var controlledSystemFiles = []string{
 	"system/contracts/api.yaml",
 	"system/contracts/events.asyncapi.yaml",
 	"system/contracts/auth.md",
+	"system/contracts/conventions.md",
+	"system/contracts/errors.md",
+	"system/security/model.md",
 	"system/data/schema.sql",
 }
 
@@ -198,6 +204,12 @@ func (a *App) init() error {
 		return err
 	}
 	if root, ok := findRoot(start); ok {
+		if err := scaffoldSystem(root); err != nil {
+			return err
+		}
+		if err := ensureAllowlists(root); err != nil {
+			return err
+		}
 		if err := a.ensureImplementationOpenSpec(root); err != nil {
 			return err
 		}
@@ -356,6 +368,7 @@ func (a *App) explore(args []string) error {
 	role := inferRole(root, a.opts.Dir)
 	fmt.Fprintf(a.opts.Stdout, "SYS EXPLORE\n\nTopic: %s\nPhase: %s\nRole: %s\n\n", topic, state.Phase, role)
 	fmt.Fprintln(a.opts.Stdout, "Use current /system files as the project foundation.")
+	fmt.Fprintln(a.opts.Stdout, "Explore architecture, contracts, contract conventions, contract errors, flows, modules, data, security, and observability as relevant.")
 	fmt.Fprintln(a.opts.Stdout, "During design phase, do not create OpenSpec changes.")
 	fmt.Fprintln(a.opts.Stdout, "When decisions are final, invoke sys capture or the Codex sys-capture skill.")
 	fmt.Fprintln(a.opts.Stdout, "\nAllowed system files:")
@@ -375,7 +388,8 @@ func (a *App) capture() error {
 	}
 	fmt.Fprintln(a.opts.Stdout, "SYS CAPTURE")
 	fmt.Fprintln(a.opts.Stdout, "Capture only finalized decisions.")
-	fmt.Fprintln(a.opts.Stdout, "Update the relevant /system files and add a decision record under system/architecture/decisions/.")
+	fmt.Fprintln(a.opts.Stdout, "Update the relevant /system files: architecture, contracts, conventions, errors, flows, modules, data, security, or observability.")
+	fmt.Fprintln(a.opts.Stdout, "Add a decision record under system/architecture/decisions/.")
 	fmt.Fprintln(a.opts.Stdout, "Each decision record should include status, decision, rationale, and affected files.")
 	return nil
 }
@@ -589,6 +603,7 @@ func scaffoldSystem(root string) error {
 		"system/contracts",
 		"system/flows",
 		"system/modules",
+		"system/security",
 		"system/data/db",
 		"system/obs/dashboards",
 	}
@@ -602,8 +617,11 @@ func scaffoldSystem(root string) error {
 		"system/contracts/api.yaml":             "openapi: 3.1.0\ninfo:\n  title: System API\n  version: 0.1.0\npaths: {}\n",
 		"system/contracts/events.asyncapi.yaml": "asyncapi: 3.0.0\ninfo:\n  title: System Events\n  version: 0.1.0\nchannels: {}\noperations: {}\ncomponents:\n  messages: {}\n",
 		"system/contracts/auth.md":              "# Auth Contract\n\nDescribe authentication, authorization, sessions, tokens, permissions, and boundary rules.\n",
+		"system/contracts/conventions.md":       "# Contract Conventions\n\nDescribe cross-cutting API and event conventions: pagination, filtering, sorting, idempotency, correlation IDs, timestamps, versioning, deprecation, and rate-limit expression.\n",
+		"system/contracts/errors.md":            "# Error Contract\n\nDescribe error envelopes, error codes, retryability, validation failures, and user-facing versus internal error boundaries.\n",
 		"system/modules/frontend.md":            "# Frontend Modules\n\nDescribe Next.js pages, components, responsibilities, and dependencies.\n",
 		"system/modules/backend.md":             "# Backend Modules\n\nDescribe Go services, modules, responsibilities, and dependencies.\n",
+		"system/security/model.md":              "# Security Model\n\nDescribe trust boundaries, sensitive data rules, encryption expectations, secret handling, security invariants, and threat assumptions. Do not store secret values here.\n",
 		"system/data/schema.sql":                "-- Canonical Postgres schema.\n",
 		"system/data/schema.md":                 "# Data Schema\n\nExplain database tables, relationships, invariants, protobuf files, and schema rationale. `schema.sql` is canonical for Postgres.\n",
 		"system/data/db/indexes.md":             "# Database Indexes\n\nDocument database indexes and why they exist.\n",
@@ -631,6 +649,38 @@ func writeFileIfMissing(path, content string) error {
 		return err
 	}
 	return os.WriteFile(path, []byte(content), 0o644)
+}
+
+func ensureAllowlists(root string) error {
+	defaults := defaultAllowlists()
+	var existing map[string][]string
+	if err := loadJSON(filepath.Join(root, ".sys-orchestrator", "allowlists.json"), &existing); err != nil {
+		existing = map[string][]string{}
+	}
+	changed := false
+	for role, defaultEntries := range defaults {
+		entries := existing[role]
+		for _, entry := range defaultEntries {
+			if !containsString(entries, entry) {
+				entries = append(entries, entry)
+				changed = true
+			}
+		}
+		existing[role] = entries
+	}
+	if !changed {
+		return nil
+	}
+	return saveJSON(filepath.Join(root, ".sys-orchestrator", "allowlists.json"), existing)
+}
+
+func containsString(values []string, want string) bool {
+	for _, value := range values {
+		if value == want {
+			return true
+		}
+	}
+	return false
 }
 
 func (a *App) requireImplementationOpenSpecDir(root string) (string, error) {
@@ -669,6 +719,7 @@ func defaultAllowlists() map[string][]string {
 			"system/contracts/**",
 			"system/flows/**",
 			"system/modules/frontend.md",
+			"system/security/**",
 		},
 		RoleBackend: {
 			"system/architecture/system.md",
@@ -677,6 +728,7 @@ func defaultAllowlists() map[string][]string {
 			"system/modules/backend.md",
 			"system/data/**",
 			"system/obs/**",
+			"system/security/**",
 		},
 		RoleSystem: {
 			"system/**",

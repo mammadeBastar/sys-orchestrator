@@ -30,8 +30,8 @@ Use this skill during build phase to implement an OpenSpec change while preservi
 
 - Infer role from the current working directory.
 - Read the allowed `/system` files for that role before deciding how to implement.
-- Frontend agents should treat `system/contracts/`, `system/flows/`, and `system/modules/frontend.md` as their build context.
-- Backend agents should treat `system/contracts/`, `system/flows/`, `system/modules/backend.md`, `system/data/`, and `system/obs/` as their build context.
+- Frontend agents should treat `system/contracts/`, `system/flows/`, `system/modules/frontend.md`, and `system/security/**` as their build context when security invariants affect the work.
+- Backend agents should treat `system/contracts/`, `system/flows/`, `system/modules/backend.md`, `system/data/`, `system/security/**`, and `system/obs/` as their build context when relevant.
 - Change agents may read OpenSpec change files and the `/system` files required by that change.
 
 ## Workflow
@@ -50,6 +50,7 @@ Use this skill during build phase to implement an OpenSpec change while preservi
 - Run focused tests for the changed behavior.
 - Run broader tests required by the OpenSpec change before completion.
 - Re-read modified code and relevant `/system` files to check alignment.
+- Confirm implementation respects contract conventions, error behavior, and security invariants when those files apply.
 - Confirm no frozen /system files changed accidentally.
 - Confirm OpenSpec task checkboxes accurately reflect completed work.
 

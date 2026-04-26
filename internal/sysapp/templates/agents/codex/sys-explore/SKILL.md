@@ -5,7 +5,7 @@ description: Explore system design using /system as the current project truth. D
 
 ## Purpose
 
-Use this skill when the user wants to explore architecture, contracts, flows, modules, data, observability, or a feature idea before implementation. The goal is to help the user reach hard design decisions that can later be captured into `/system`.
+Use this skill when the user wants to explore architecture, contracts, flows, modules, data, security, observability, or a feature idea before implementation. The goal is to help the user reach hard design decisions that can later be captured into `/system`.
 
 ## Initial Checks
 
@@ -25,8 +25,8 @@ Use this skill when the user wants to explore architecture, contracts, flows, mo
 ## Role And File Access
 
 - Respect the role inferred from the current working directory.
-- Frontend work should usually read `system/architecture/system.md`, `system/contracts/**`, `system/flows/**`, and `system/modules/frontend.md`.
-- Backend work should usually read `system/architecture/system.md`, `system/contracts/**`, `system/flows/**`, `system/modules/backend.md`, `system/data/**`, and `system/obs/**`.
+- Frontend work should usually read `system/architecture/system.md`, `system/contracts/**`, `system/flows/**`, `system/modules/frontend.md`, and `system/security/**`.
+- Backend work should usually read `system/architecture/system.md`, `system/contracts/**`, `system/flows/**`, `system/modules/backend.md`, `system/data/**`, `system/security/**`, and `system/obs/**`.
 - Design and system-maintainer work may read broader `/system` context.
 - Treat allowed /system files as the source of truth and avoid reading unrelated implementation files unless the user asks for codebase investigation.
 
@@ -34,7 +34,7 @@ Use this skill when the user wants to explore architecture, contracts, flows, mo
 
 1. Restate the topic and the current phase/role.
 2. Read the relevant `/system` files and summarize only the facts that matter.
-3. Explore architecture, contracts, flows, modules, data, and observability implications as relevant.
+3. Explore architecture, contracts, flows, modules, data, security, and observability implications as relevant.
 4. Ask focused questions only when a hard decision cannot be made from context.
 5. Surface candidate decisions with trade-offs and the exact `/system` files they would affect.
 6. Keep design choices precise enough that another agent can continue later.
@@ -44,6 +44,8 @@ Use this skill when the user wants to explore architecture, contracts, flows, mo
 
 - Check that candidate decisions do not contradict existing `/system` truth.
 - Check that every cross-boundary behavior belongs in `system/contracts/`.
+- Check that contract conventions belong in `system/contracts/conventions.md` and error behavior belongs in `system/contracts/errors.md`.
+- Check that trust boundaries, sensitive data rules, secret handling, and security invariants belong in `system/security/model.md`.
 - Check that every user-visible action has or will need a matching `system/flows/*.flow.md` file.
 - Check that data shape changes are reflected in both `system/data/schema.sql` and `system/data/schema.md` when relevant.
 

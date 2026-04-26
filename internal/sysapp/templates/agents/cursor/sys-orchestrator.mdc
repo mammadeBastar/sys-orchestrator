@@ -10,6 +10,7 @@ This is the minimal Cursor integration for Sys Orchestrator. It gives workflow b
 ## Core Rules
 
 - Treat `/system` as the current project foundation and source of truth.
+- Treat contracts and security as foundation truth: API/events/auth/conventions/errors live under `system/contracts/`, and security posture lives under `system/security/`.
 - Respect phase boundaries: design phase captures decisions into `/system`; build phase implements OpenSpec changes.
 - Run `sys status` before substantial work and use its phase, role, validation, and freeze signals.
 - Infer role from the current working directory and read only the relevant `/system` files.
