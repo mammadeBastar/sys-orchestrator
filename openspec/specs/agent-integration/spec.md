@@ -83,7 +83,8 @@ The system SHALL generate a `sysi-design-change` Codex skill that defines contro
 
 #### Scenario: Design change skill installed
 - **WHEN** `sysi-design-change/SKILL.md` is generated
-- **THEN** it requires rationale, affected `/system` files including security files when security truth changes, impacted OpenSpec changes, migration or compatibility notes, validation before and after mutation, and explicit user confirmation before updating controlled or frozen files
+- **THEN** it requires agents to open and maintain the `system/architecture/decisions/<date>-<name>.md` decision artifact created by `sysi design-change`
+- **AND** it requires rationale, affected `/system` files including security files when security truth changes, impacted frontend/backend OpenSpec changes, migration or compatibility notes, validation before and after mutation, and explicit user confirmation before updating controlled or frozen files
 
 ### Requirement: Agent Instructions Use Maintainable Templates
 The system SHALL keep generated agent instruction content in maintainable template-backed assets or clearly separated template constants.

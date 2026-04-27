@@ -9,14 +9,20 @@ The system SHALL provide `sysi status` as the primary terminal dashboard.
 
 #### Scenario: Status in terminal
 - **WHEN** a user runs `sysi status` in an initialized project
-- **THEN** the system prints a structured dashboard showing phase, freeze state, validation health, OpenSpec summary, agent installs, recent decisions, and warnings
+- **THEN** the system prints a structured dashboard showing phase, freeze state, validation health, frontend/backend OpenSpec workspace summary, agent installs, recent decisions, and warnings
+- **AND** the OpenSpec summary is aggregated only from `frontend/openspec` and `backend/openspec`
+- **AND** the system does not read or count root-level OpenSpec changes
 
 ### Requirement: Provide Machine-Readable Status
 The system SHALL provide JSON status output for agents and scripts.
 
 #### Scenario: JSON status requested
 - **WHEN** a user runs `sysi status --json`
-- **THEN** the system prints valid JSON containing phase, root path, detected role, validation results, freeze state, and agent integration state
+- **THEN** the system prints valid JSON containing phase, root path, detected role, validation results, freeze state, agent integration state, aggregate OpenSpec active change count, and per-workspace OpenSpec status for `frontend` and `backend`
+
+#### Scenario: Root OpenSpec is ignored
+- **WHEN** a sysi project contains a root-level `openspec/changes` directory
+- **THEN** `sysi status` does not include those root-level changes in the OpenSpec active change count
 
 ### Requirement: Watch Status
 The system SHALL support a watch mode for repeated status refreshes.

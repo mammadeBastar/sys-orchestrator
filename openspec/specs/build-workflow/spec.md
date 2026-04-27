@@ -40,7 +40,9 @@ The system SHALL provide `sysi design-change` for foundational `/system` mutatio
 
 #### Scenario: Foundation change requested during build
 - **WHEN** a user runs `sysi design-change change-auth-boundary`
-- **THEN** the system creates or guides a controlled change path that records rationale, affected `/system` files, and impacted active OpenSpec changes
+- **THEN** the system verifies the project is in build phase
+- **AND** the system creates a design-change artifact under `system/architecture/decisions/<date>-change-auth-boundary.md`
+- **AND** the artifact records rationale, affected `/system` files, impacted active frontend/backend OpenSpec changes, migration or compatibility notes, explicit confirmation, decision, and consequences
 
 ### Requirement: Require User-Confirmed Design Drift Handoff During Apply
 The system SHALL require apply work to stop and use a user-confirmed design-change handoff when implementation needs drift from `/system` foundation truth.

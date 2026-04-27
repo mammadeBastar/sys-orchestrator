@@ -145,6 +145,54 @@ func TestRootDiscoveryAndStatusJSON(t *testing.T) {
 	assertContainsAll(t, "backend allowlist", strings.Join(allowlists[RoleBackend], "\n"), []string{"system/security/**"})
 }
 
+func TestStatusAggregatesImplementationOpenSpecWorkspacesOnly(t *testing.T) {
+	root := t.TempDir()
+	fakeOpenSpec, _ := writeFakeOpenSpec(t, root)
+	if code, out, errOut := runAppWithOpenSpec(t, root, fakeOpenSpec, "init"); code != 0 {
+		t.Fatalf("init failed: code=%d stdout=%q stderr=%q", code, out, errOut)
+	}
+
+	for _, rel := range []string{
+		"openspec/changes/root-change",
+		"frontend/openspec/changes/add-login",
+		"frontend/openspec/changes/archive/old-ui",
+		"backend/openspec/changes/add-api",
+	} {
+		if err := os.MkdirAll(filepath.Join(root, rel), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	code, out, errOut := runApp(t, root, "status", "--json")
+	if code != 0 {
+		t.Fatalf("status json failed: code=%d stdout=%q stderr=%q", code, out, errOut)
+	}
+
+	var status map[string]any
+	if err := json.Unmarshal([]byte(out), &status); err != nil {
+		t.Fatalf("status output is not json: %v\n%s", err, out)
+	}
+	openspecStatus := status["openspec"].(map[string]any)
+	if got := int(openspecStatus["activeChanges"].(float64)); got != 2 {
+		t.Fatalf("active OpenSpec changes = %d, want 2; full status:\n%s", got, out)
+	}
+	workspaces := openspecStatus["workspaces"].([]any)
+	if len(workspaces) != 2 {
+		t.Fatalf("workspace count = %d, want 2; full status:\n%s", len(workspaces), out)
+	}
+	wantCounts := map[string]int{"frontend": 1, "backend": 1}
+	for _, raw := range workspaces {
+		workspace := raw.(map[string]any)
+		name := workspace["name"].(string)
+		if got, want := int(workspace["activeChanges"].(float64)), wantCounts[name]; got != want {
+			t.Fatalf("%s active changes = %d, want %d; full status:\n%s", name, got, want, out)
+		}
+		if !workspace["present"].(bool) {
+			t.Fatalf("%s workspace should be present; full status:\n%s", name, out)
+		}
+	}
+}
+
 func TestInitUsesSysiOpenSpecEnvironment(t *testing.T) {
 	root := t.TempDir()
 	fakeOpenSpec, _ := writeFakeOpenSpec(t, root)
@@ -156,6 +204,25 @@ func TestInitUsesSysiOpenSpecEnvironment(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(root, ".sysi", "state.json")); err != nil {
 		t.Fatalf("expected .sysi/state.json to exist: %v", err)
+	}
+}
+
+func TestValidateReportsMissingImplementationOpenSpecWorkspace(t *testing.T) {
+	root := t.TempDir()
+	fakeOpenSpec, _ := writeFakeOpenSpec(t, root)
+	if code, out, errOut := runAppWithOpenSpec(t, root, fakeOpenSpec, "init"); code != 0 {
+		t.Fatalf("init failed: code=%d stdout=%q stderr=%q", code, out, errOut)
+	}
+	if err := os.Remove(filepath.Join(root, "backend", "openspec", "config.yaml")); err != nil {
+		t.Fatal(err)
+	}
+
+	code, out, errOut := runApp(t, root, "validate")
+	if code == 0 {
+		t.Fatalf("validate should fail when backend OpenSpec workspace is missing: stdout=%q stderr=%q", out, errOut)
+	}
+	if !strings.Contains(out+errOut, "backend/openspec/config.yaml") {
+		t.Fatalf("missing workspace warning not found in output: stdout=%q stderr=%q", out, errOut)
 	}
 }
 
@@ -268,6 +335,42 @@ func TestDesignCommandsMentionExpandedFoundationTargets(t *testing.T) {
 	})
 	if !strings.Contains(out, "decision record") {
 		t.Fatalf("capture output should mention decision records: %s", out)
+	}
+}
+
+func TestDesignChangeCreatesDatedDecisionArtifact(t *testing.T) {
+	root := t.TempDir()
+	fakeOpenSpec, _ := writeFakeOpenSpec(t, root)
+	if code, out, errOut := runAppWithOpenSpec(t, root, fakeOpenSpec, "init"); code != 0 {
+		t.Fatalf("init failed: code=%d stdout=%q stderr=%q", code, out, errOut)
+	}
+	if code, out, errOut := runApp(t, root, "design", "freeze"); code != 0 {
+		t.Fatalf("design freeze failed: code=%d stdout=%q stderr=%q", code, out, errOut)
+	}
+
+	code, out, errOut := runApp(t, root, "design-change", "change auth boundary")
+	if code != 0 {
+		t.Fatalf("design-change failed: code=%d stdout=%q stderr=%q", code, out, errOut)
+	}
+
+	matches, err := filepath.Glob(filepath.Join(root, "system", "architecture", "decisions", "*-change-auth-boundary.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(matches) != 1 {
+		t.Fatalf("expected one dated decision artifact, got %d: %v", len(matches), matches)
+	}
+	content := readFile(t, matches[0])
+	assertContainsAll(t, "design-change artifact", content, []string{
+		"# Design Change: change auth boundary",
+		"Status: proposed",
+		"## Rationale",
+		"## Affected System Files",
+		"## Impacted OpenSpec Changes",
+		"## Migration Or Compatibility Notes",
+	})
+	if !strings.Contains(out, filepath.Base(matches[0])) {
+		t.Fatalf("design-change output should mention artifact path: %q", out)
 	}
 }
 
@@ -395,6 +498,7 @@ func TestCodexInstructionPacksContainOperationalGuardrails(t *testing.T) {
 		},
 		"sysi-design-change": {
 			"explicit user confirmation",
+			"decision artifact",
 			"migration or compatibility notes",
 			"impacted OpenSpec changes",
 			"before and after",

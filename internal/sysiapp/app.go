@@ -74,8 +74,16 @@ type AgentStatus struct {
 }
 
 type OpenSpecStatus struct {
-	Present       bool `json:"present"`
-	ActiveChanges int  `json:"activeChanges"`
+	Present       bool                      `json:"present"`
+	ActiveChanges int                       `json:"activeChanges"`
+	Workspaces    []OpenSpecWorkspaceStatus `json:"workspaces"`
+}
+
+type OpenSpecWorkspaceStatus struct {
+	Name          string `json:"name"`
+	Path          string `json:"path"`
+	Present       bool   `json:"present"`
+	ActiveChanges int    `json:"activeChanges"`
 }
 
 type Status struct {
@@ -402,9 +410,22 @@ func (a *App) designChange(args []string) error {
 	if err != nil {
 		return err
 	}
-	fmt.Fprintf(a.opts.Stdout, "SYSI DESIGN CHANGE: %s\n\n", args[0])
+	name := strings.Join(args, " ")
+	if state.Phase != PhaseBuild {
+		return errors.New("design changes require build phase; run sysi design freeze first")
+	}
+	artifact, err := createDesignChangeArtifact(root, name, time.Now().UTC())
+	if err != nil {
+		return err
+	}
+	relArtifact, err := filepath.Rel(root, artifact)
+	if err != nil {
+		relArtifact = artifact
+	}
+	fmt.Fprintf(a.opts.Stdout, "SYSI DESIGN CHANGE: %s\n\n", name)
 	fmt.Fprintf(a.opts.Stdout, "Phase: %s\n", state.Phase)
 	fmt.Fprintf(a.opts.Stdout, "Root: %s\n\n", root)
+	fmt.Fprintf(a.opts.Stdout, "Artifact: %s\n\n", filepath.ToSlash(relArtifact))
 	fmt.Fprintln(a.opts.Stdout, "Record rationale, affected /system files, impacted OpenSpec changes, and migration notes before mutating frozen foundation files.")
 	return nil
 }
@@ -521,6 +542,9 @@ func (a *App) renderStatus(status Status) {
 	fmt.Fprintf(a.opts.Stdout, "System health: %s\n", health)
 	fmt.Fprintf(a.opts.Stdout, "Freeze baselines: %d\n", status.Freeze.Baselines)
 	fmt.Fprintf(a.opts.Stdout, "OpenSpec changes: %d\n", status.OpenSpec.ActiveChanges)
+	for _, workspace := range status.OpenSpec.Workspaces {
+		fmt.Fprintf(a.opts.Stdout, "  - %s: present=%t changes=%d\n", workspace.Name, workspace.Present, workspace.ActiveChanges)
+	}
 	fmt.Fprintf(a.opts.Stdout, "Agents: codex=%t cursor=%t claude=%t\n", status.Agents.Codex, status.Agents.Cursor, status.Agents.Claude)
 	if len(status.Validation.Warnings) > 0 {
 		fmt.Fprintln(a.opts.Stdout, "\nWarnings:")
@@ -753,6 +777,87 @@ func allowlistForRole(root, role string) []string {
 	return allowed
 }
 
+func createDesignChangeArtifact(root, name string, now time.Time) (string, error) {
+	slug := slugify(name)
+	if slug == "" {
+		return "", errors.New("design-change name must contain at least one letter or number")
+	}
+	date := now.Format("2006-01-02")
+	path := filepath.Join(root, "system", "architecture", "decisions", date+"-"+slug+".md")
+	if exists(path) {
+		return path, nil
+	}
+	content := fmt.Sprintf(`# Design Change: %s
+
+Status: proposed
+Date: %s
+
+## Rationale
+
+Describe why normal OpenSpec apply work cannot continue without changing foundation truth.
+
+## Affected System Files
+
+- TBD
+
+## Impacted OpenSpec Changes
+
+- frontend: TBD
+- backend: TBD
+
+## Migration Or Compatibility Notes
+
+Describe compatibility, migration, data, API, security, and operational impact.
+
+## Confirmation
+
+Record the explicit user confirmation before controlled or frozen files are edited.
+
+## Decision
+
+Describe the foundation change after it is accepted.
+
+## Consequences
+
+Describe the expected follow-up work and trade-offs.
+`, name, date)
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return "", err
+	}
+	file, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o644)
+	if err != nil {
+		if errors.Is(err, os.ErrExist) {
+			return path, nil
+		}
+		return "", err
+	}
+	defer file.Close()
+	if _, err := file.WriteString(content); err != nil {
+		return "", err
+	}
+	return path, nil
+}
+
+func slugify(value string) string {
+	var builder strings.Builder
+	lastHyphen := false
+	for _, r := range strings.ToLower(value) {
+		isLetter := r >= 'a' && r <= 'z'
+		isDigit := r >= '0' && r <= '9'
+		if isLetter || isDigit {
+			builder.WriteRune(r)
+			lastHyphen = false
+			continue
+		}
+		if builder.Len() > 0 && !lastHyphen {
+			builder.WriteByte('-')
+			lastHyphen = true
+		}
+	}
+	slug := builder.String()
+	return strings.Trim(slug, "-")
+}
+
 func computeFreeze(root string) (Freeze, error) {
 	freeze := Freeze{Files: map[string]FreezeFile{}}
 	for _, rel := range controlledSystemFiles {
@@ -774,6 +879,12 @@ func validateSystem(root string, state State) (Validation, FreezeStatus) {
 	for _, rel := range requiredSystemFiles {
 		if _, err := os.Stat(filepath.Join(root, rel)); err != nil {
 			warnings = append(warnings, fmt.Sprintf("missing required file: %s", rel))
+		}
+	}
+	for _, target := range implementationOpenSpecTargets {
+		rel := filepath.ToSlash(filepath.Join(target, "openspec", "config.yaml"))
+		if _, err := os.Stat(filepath.Join(root, rel)); err != nil {
+			warnings = append(warnings, fmt.Sprintf("missing implementation OpenSpec workspace: %s", rel))
 		}
 	}
 
@@ -840,18 +951,35 @@ func agentStatus(root string) AgentStatus {
 }
 
 func openSpecStatus(root string) OpenSpecStatus {
-	changesDir := filepath.Join(root, "openspec", "changes")
-	entries, err := os.ReadDir(changesDir)
-	if err != nil {
-		return OpenSpecStatus{Present: exists(filepath.Join(root, "openspec"))}
-	}
-	count := 0
-	for _, entry := range entries {
-		if entry.IsDir() {
-			count++
+	status := OpenSpecStatus{Present: true}
+	for _, target := range implementationOpenSpecTargets {
+		workspace := openSpecWorkspaceStatus(root, target)
+		status.Workspaces = append(status.Workspaces, workspace)
+		status.ActiveChanges += workspace.ActiveChanges
+		if !workspace.Present {
+			status.Present = false
 		}
 	}
-	return OpenSpecStatus{Present: true, ActiveChanges: count}
+	return status
+}
+
+func openSpecWorkspaceStatus(root, target string) OpenSpecWorkspaceStatus {
+	workspace := OpenSpecWorkspaceStatus{
+		Name:    target,
+		Path:    target,
+		Present: exists(filepath.Join(root, target, "openspec", "config.yaml")),
+	}
+	changesDir := filepath.Join(root, target, "openspec", "changes")
+	entries, err := os.ReadDir(changesDir)
+	if err != nil {
+		return workspace
+	}
+	for _, entry := range entries {
+		if entry.IsDir() && entry.Name() != "archive" {
+			workspace.ActiveChanges++
+		}
+	}
+	return workspace
 }
 
 func exists(path string) bool {

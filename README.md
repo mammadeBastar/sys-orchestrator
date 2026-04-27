@@ -424,6 +424,8 @@ system/data/schema.sql
 
 Build phase uses OpenSpec for implementation changes. Run build change commands from the implementation workspace that owns the work, either `frontend/` or `backend/`. The sysi CLI still discovers the monorepo root from those directories, but it runs OpenSpec in the inferred implementation workspace.
 
+Sysi-managed projects do not use a root OpenSpec workspace. `sysi init` creates `frontend/openspec/` and `backend/openspec/`, and status only reads those two workspaces.
+
 Before using build commands, freeze the design:
 
 ```bash
@@ -497,6 +499,7 @@ This prints the required design-change guidance:
 - affected `/system` files
 - impacted OpenSpec changes
 - migration notes
+- a dated artifact under `system/architecture/decisions/`
 
 ## Agent Integrations
 
@@ -609,7 +612,7 @@ The dashboard shows:
 - inferred role
 - system health
 - freeze baselines
-- OpenSpec change summary
+- frontend/backend OpenSpec workspace summary
 - installed agent integrations
 - validation warnings
 
@@ -628,6 +631,8 @@ This is useful for agents and scripts. It includes:
 - `freeze`
 - `agents`
 - `openspec`
+
+The `openspec` object aggregates active changes from `frontend/openspec` and `backend/openspec` only. Root-level OpenSpec directories are not part of sysi project status.
 
 ### Watch Mode
 
@@ -736,11 +741,13 @@ In build phase this command fails and points users to `sysi design-change`.
 
 ### `sysi design-change <name>`
 
-Prints controlled mutation guidance for foundational `/system` changes during build phase.
+Requires build phase and creates a controlled mutation artifact for foundational `/system` changes.
 
 ```bash
 sysi design-change change-auth-boundary
 ```
+
+The artifact is created under `system/architecture/decisions/<date>-change-auth-boundary.md` and is the working record for rationale, affected `/system` files, impacted frontend/backend OpenSpec changes, migration notes, confirmation, decision, and consequences.
 
 ### `sysi change propose <name>`
 

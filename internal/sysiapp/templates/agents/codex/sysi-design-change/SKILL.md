@@ -11,9 +11,10 @@ Use this skill when build-phase work needs to mutate controlled or frozen `/syst
 
 1. Run or read `sysi status --json`.
 2. Run `sysi design-change <name>` or read its output.
-3. Identify the current OpenSpec change, if any.
-4. Read the affected `/system` files before proposing edits.
-5. Check validation warnings and freeze mutations before changing anything.
+3. Open the created decision artifact under `system/architecture/decisions/<date>-<name>.md`.
+4. Identify the current frontend or backend OpenSpec change, if any.
+5. Read the affected `/system` files before proposing edits.
+6. Check validation warnings and freeze mutations before changing anything.
 
 ## Phase Rules
 
@@ -34,17 +35,19 @@ Use this skill when build-phase work needs to mutate controlled or frozen `/syst
 ## Workflow
 
 1. State why normal apply cannot continue without changing foundation truth.
-2. List affected `/system` files.
-3. List impacted OpenSpec changes and implementation tasks.
+2. Update the decision artifact with the rationale as the working record.
+3. List affected `/system` files in the decision artifact.
+4. List impacted OpenSpec changes and implementation tasks in the decision artifact.
 4. Describe migration or compatibility notes for already-built code, data, APIs, or operations.
 5. Ask for explicit user confirmation before editing controlled or frozen files.
 6. Apply the smallest coherent `/system` mutation after confirmation.
-7. Update or create a decision record when the foundation decision has lasting architectural impact.
+7. Update the decision artifact with the accepted decision and consequences.
 8. Re-run validation before and after the mutation when possible.
 
 ## Validation
 
 - Capture the before and after state of affected files in the conversation summary.
+- Confirm the decision artifact records rationale, affected files, impacted OpenSpec changes, compatibility notes, confirmation, decision, and consequences.
 - Confirm edited `/system` files do not conflict.
 - Confirm security changes are captured in `system/security/model.md` when they affect trust boundaries, sensitive data, secrets, or security invariants.
 - Confirm impacted OpenSpec changes still describe the intended implementation.
