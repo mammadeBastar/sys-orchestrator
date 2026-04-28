@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -134,7 +135,7 @@ var implementationOpenSpecTargets = []string{
 	"backend",
 }
 
-//go:embed templates/agents/codex/*/SKILL.md templates/agents/cursor/sysi.mdc templates/agents/claude/CLAUDE.section.md
+//go:embed templates/agents/codex/*/SKILL.md templates/agents/codex/*/references/*.md templates/agents/cursor/sysi.mdc templates/agents/claude/CLAUDE.section.md
 var agentTemplates embed.FS
 
 func New(opts Options) *App {
@@ -1021,22 +1022,36 @@ func (a *App) runOpenSpec(root string, args ...string) error {
 }
 
 func installCodex(root string) error {
-	skills := map[string]string{
-		"sysi-explore":       "codex/sysi-explore/SKILL.md",
-		"sysi-capture":       "codex/sysi-capture/SKILL.md",
-		"sysi-apply":         "codex/sysi-apply/SKILL.md",
-		"sysi-design-change": "codex/sysi-design-change/SKILL.md",
+	skills := []string{
+		"sysi-explore",
+		"sysi-capture",
+		"sysi-apply",
+		"sysi-design-change",
 	}
-	for name, templatePath := range skills {
-		content, err := agentInstructionTemplate(templatePath)
-		if err != nil {
-			return err
-		}
-		path := filepath.Join(root, ".codex", "skills", name, "SKILL.md")
-		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-			return err
-		}
-		if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+	for _, name := range skills {
+		templateRoot := "templates/agents/codex/" + name
+		targetRoot := filepath.Join(root, ".codex", "skills", name)
+		if err := fs.WalkDir(agentTemplates, templateRoot, func(path string, entry fs.DirEntry, walkErr error) error {
+			if walkErr != nil {
+				return walkErr
+			}
+			if entry.IsDir() {
+				return nil
+			}
+			rel, err := filepath.Rel(templateRoot, path)
+			if err != nil {
+				return err
+			}
+			data, err := agentTemplates.ReadFile(path)
+			if err != nil {
+				return err
+			}
+			target := filepath.Join(targetRoot, filepath.FromSlash(rel))
+			if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
+				return err
+			}
+			return os.WriteFile(target, data, 0o644)
+		}); err != nil {
 			return err
 		}
 	}

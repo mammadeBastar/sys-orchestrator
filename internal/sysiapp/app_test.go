@@ -472,15 +472,27 @@ func TestCodexInstructionPacksContainOperationalGuardrails(t *testing.T) {
 			"sysi-capture",
 			"avoid implementation",
 			"system/security/**",
+			"principal-engineer design review",
+			"## Design Review Lens",
+			"source of truth",
+			"invariants",
+			"operational recovery",
+			"DDIA Mental Model Reference",
+			"references/ddia-mental-model.md",
 		},
 		"sysi-capture": {
 			"Finalized Decision",
 			"Decision Record",
 			"avoid duplicated truth",
+			"## System File Routing",
+			"Must Own",
+			"Must Not Contain",
+			"Cross-Link Instead When",
 			"system/architecture/decisions",
 			"system/contracts/conventions.md",
 			"system/contracts/errors.md",
 			"system/security/model.md",
+			"system/data/db/indexes.md",
 		},
 		"sysi-apply": {
 			"OpenSpec",
@@ -501,6 +513,11 @@ func TestCodexInstructionPacksContainOperationalGuardrails(t *testing.T) {
 			"decision artifact",
 			"migration or compatibility notes",
 			"impacted OpenSpec changes",
+			"## Foundation Change Routing",
+			"Must Own",
+			"Must Not Contain",
+			"Cross-Link Instead When",
+			"schema evolution",
 			"before and after",
 			"system/security/",
 		},
@@ -509,6 +526,19 @@ func TestCodexInstructionPacksContainOperationalGuardrails(t *testing.T) {
 		content := readFile(t, filepath.Join(root, ".codex", "skills", skill, "SKILL.md"))
 		assertContainsAll(t, ".codex/skills/"+skill+"/SKILL.md", content, markers)
 	}
+
+	ddiaReference := readFile(t, filepath.Join(root, ".codex", "skills", "sysi-explore", "references", "ddia-mental-model.md"))
+	assertContainsAll(t, "sysi-explore DDIA reference", ddiaReference, []string{
+		"Data Models",
+		"Storage And Retrieval",
+		"Encoding And Evolution",
+		"Replication",
+		"Partitioning",
+		"Transactions",
+		"Consistency",
+		"Batch And Stream Processing",
+		"Derived Data",
+	})
 }
 
 func TestCursorAndClaudeInstructionsContainWorkflowBoundaries(t *testing.T) {

@@ -52,6 +52,8 @@ The system SHALL generate a `sysi-explore` Codex skill that guides design-phase 
 #### Scenario: Explore skill installed
 - **WHEN** `sysi-explore/SKILL.md` is generated
 - **THEN** it instructs agents to read status, infer role, read allowed `/system` files, explore architecture/contracts/flows/modules/data/security/observability as relevant, surface candidate decisions, avoid implementation, and suggest `sysi-capture` only after decisions are finalized
+- **AND** it instructs agents to review designs through source-of-truth, invariant, failure-mode, concurrency, retry, idempotency, schema-evolution, observability, scaling, security-boundary, migration, and operational-recovery lenses
+- **AND** it references a DDIA-inspired mental-model file under `references/` for data models, storage and retrieval, encoding and evolution, replication, partitioning, transactions, consistency, batch and stream processing, and derived data
 
 ### Requirement: Codex Capture Skill Guides System Mutation
 The system SHALL generate a `sysi-capture` Codex skill that guides finalized design decisions into `/system`.
@@ -59,6 +61,7 @@ The system SHALL generate a `sysi-capture` Codex skill that guides finalized des
 #### Scenario: Capture skill installed
 - **WHEN** `sysi-capture/SKILL.md` is generated
 - **THEN** it defines what counts as a finalized decision, how to select target `/system` files including contract conventions, contract errors, and security model files, how to avoid duplicated truth, how to write decision records, how to validate after capture, and when to stop instead of mutating files
+- **AND** it includes a routing table that defines what each `/system` file must own, what it must not contain, and when to cross-link instead of duplicating truth
 
 ### Requirement: Codex Apply Skill Enforces Build Apply Boundaries
 The system SHALL generate a `sysi-apply` Codex skill that coordinates OpenSpec apply with Sysi foundation rules and Superpowers discipline.
@@ -85,6 +88,8 @@ The system SHALL generate a `sysi-design-change` Codex skill that defines contro
 - **WHEN** `sysi-design-change/SKILL.md` is generated
 - **THEN** it requires agents to open and maintain the `system/architecture/decisions/<date>-<name>.md` decision artifact created by `sysi design-change`
 - **AND** it requires rationale, affected `/system` files including security files when security truth changes, impacted frontend/backend OpenSpec changes, migration or compatibility notes, validation before and after mutation, and explicit user confirmation before updating controlled or frozen files
+- **AND** it includes a foundation-change routing table that defines what each `/system` file must own, what it must not contain, and when to cross-link instead of duplicating truth
+- **AND** it requires schema-evolution, compatibility, rollback, backfill, security-boundary, and observability impacts when those concerns are affected
 
 ### Requirement: Agent Instructions Use Maintainable Templates
 The system SHALL keep generated agent instruction content in maintainable template-backed assets or clearly separated template constants.
@@ -92,6 +97,10 @@ The system SHALL keep generated agent instruction content in maintainable templa
 #### Scenario: Developer reviews instruction content
 - **WHEN** a developer inspects the repository
 - **THEN** they can read the complete generated instruction content without reconstructing it from many small inline fragments
+
+#### Scenario: Codex skill resource files are installed
+- **WHEN** a generated Codex skill template includes reference files under `references/`
+- **THEN** `sysi agent install codex` installs those reference files alongside the generated `SKILL.md`
 
 ### Requirement: Cursor Instructions Are Explicit But Minimal
 The system SHALL generate Cursor rules that remain minimal while explicitly covering phase boundaries, `/system` authority, OpenSpec build workflow, design-change protection, and role inference.
